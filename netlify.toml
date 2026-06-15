@@ -1,0 +1,12 @@
+[build]
+  publish = "web"
+
+[build.environment]
+  # No build step needed — pure static HTML
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

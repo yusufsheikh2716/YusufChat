@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>YusufChat — Connect Instantly</title>
+  <meta name="description" content="YusufChat is a real-time multi-user chat app. Connect instantly with friends from any device. Made by Mohd Yusuf | BBD NIIT Lucknow." />
+  <meta name="theme-color" content="#6366f1" />
+  <meta name="author" content="Mohd Yusuf | BBD NIIT Lucknow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Design Tokens ─────────────────────────────────────────────────── */
+    :root {
+      --bg-base:       #0a0a14;
+      --bg-surface:    #12121f;
+      --bg-raised:     #1a1a2e;
+      --bg-input:      #16162a;
+      --bg-sidebar:    #0d0d1e;
+      --border:        rgba(99,102,241,0.18);
+      --border-soft:   rgba(99,102,241,0.08);
+
+      --accent:        #6366f1;
+      --accent-light:  #818cf8;
+      --accent-dark:   #4f46e5;
+      --accent-glow:   rgba(99,102,241,0.35);
+
+      --msg-own:       #312e81;
+      --msg-other:     #1e1b4b;
+      --msg-system:    rgba(30,30,50,0.7);
+
+      --text-primary:  #f1f5f9;
+      --text-muted:    #94a3b8;
+      --text-faint:    #475569;
+      --text-time:     #64748b;
+
+      --online:        #10b981;
+      --warn:          #f59e0b;
+      --error:         #ef4444;
+
+      --radius-sm:     8px;
+      --radius-md:     14px;
+      --radius-lg:     20px;
+      --radius-pill:   999px;
+
+      --shadow-glow:   0 0 30px rgba(99,102,241,0.25);
+      --shadow-card:   0 8px 32px rgba(0,0,0,0.4);
+      --transition:    0.2s ease;
+
+      font-size: 15px;
+      color-scheme: dark;
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      line-height: 1.5;
+      overflow: hidden;
+    }
+
+    /* ── Scrollbar ─────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-pill); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    @supports (scrollbar-color: auto) {
+      * { scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
+    }
+
+    /* ── App Shell ─────────────────────────────────────────────────────── */
+    #app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      grid-template-columns: 1fr 220px;
+      grid-template-areas:
+        "header  header"
+        "chat    sidebar"
+        "input   sidebar";
+      background: var(--bg-base);
+    }
+
+    /* ── Login Overlay ─────────────────────────────────────────────────── */
+    #login-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 50% 30%, rgba(99,102,241,0.18) 0%, var(--bg-base) 65%);
+      animation: fadeIn 0.4s ease;
+    }
+
+    #login-overlay.hidden { display: none; }
+
+    #login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 40px 36px 32px;
+      box-shadow: var(--shadow-card), var(--shadow-glow);
+      animation: slideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .login-logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .y-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    .login-logo h1 { font-size: 26px; font-weight: 800; color: var(--text-primary); }
+    .login-logo .tagline { font-size: 13px; color: var(--accent-light); font-weight: 500; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    .form-group input {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--bg-input);
+      border: 1.5px solid var(--border-soft);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 14px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      outline: none;
+    }
+    .form-group input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .form-group input::placeholder { color: var(--text-faint); }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    #btn-join {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      letter-spacing: 0.02em;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    #btn-join:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--accent-glow); }
+    #btn-join:active { transform: translateY(0); }
+
+    #login-error {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: var(--radius-sm);
+      color: #fca5a5;
+      font-size: 13px;
+      display: none;
+    }
+    #login-error.show { display: block; animation: shake 0.4s ease; }
+
+    .login-footer {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    #header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 58px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-soft);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 36px; height: 36px; }
+    .header-title { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+    .header-subtitle { font-size: 12px; color: var(--accent-light); font-weight: 500; }
+    .header-right { display: flex; align-items: center; gap: 14px; }
+
+    #status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-faint);
+      transition: background 0.3s ease;
+      margin-right: 4px;
+    }
+    #status-dot.online  { background: var(--online); box-shadow: 0 0 8px rgba(16,185,129,0.5); }
+    #status-dot.offline { background: var(--error);  }
+    #status-dot.connecting { background: var(--warn); animation: pulse 1.2s ease infinite; }
+
+    #status-text { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    #online-count { font-size: 12px; color: var(--online); font-weight: 600; background: rgba(16,185,129,0.1); padding: 3px 10px; border-radius: var(--radius-pill); border: 1px solid rgba(16,185,129,0.2); }
+
+    /* ── Chat Area ─────────────────────────────────────────────────────── */
+    #chat-area {
+      grid-area: chat;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      scroll-behavior: smooth;
+    }
+
+    #chat-area:empty::before {
+      content: "👋 Welcome to YusufChat! Start the conversation.";
+      display: block;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 14px;
+      margin: auto;
+      padding: 40px 0;
+    }
+
+    /* ── Message Bubbles ───────────────────────────────────────────────── */
+    .msg-wrapper {
+      display: flex;
+      flex-direction: column;
+      max-width: 72%;
+      animation: msgIn 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
+      will-change: transform, opacity;
+    }
+    .msg-wrapper.own  { align-self: flex-end; align-items: flex-end; }
+    .msg-wrapper.other{ align-self: flex-start; align-items: flex-start; }
+    .msg-wrapper.system { align-self: center; max-width: 80%; }
+
+    .msg-sender {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-light);
+      margin-bottom: 3px;
+      padding: 0 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .msg-bubble {
+      position: relative;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      line-height: 1.55;
+      word-break: break-word;
+      max-width: 100%;
+    }
+
+    .msg-wrapper.own   .msg-bubble { background: var(--msg-own);   border-bottom-right-radius: 4px; color: #e0e7ff; }
+    .msg-wrapper.other .msg-bubble { background: var(--msg-other); border-bottom-left-radius: 4px;  color: var(--text-primary); }
+    .msg-wrapper.system .msg-bubble {
+      background: var(--msg-system);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-pill);
+      font-size: 12px;
+      font-style: italic;
+      color: var(--text-muted);
+      padding: 7px 18px;
+    }
+
+    .msg-time {
+      font-size: 10px;
+      color: var(--text-time);
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
+    /* ── Typing Indicator ──────────────────────────────────────────────── */
+    #typing-bar {
+      grid-area: chat;
+      align-self: end;
+      padding: 4px 20px 8px;
+      min-height: 24px;
+      pointer-events: none;
+    }
+
+    #typing-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-style: italic;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #typing-text.visible { opacity: 1; }
+
+    .typing-dots {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+    }
+    .typing-dots span {
+      width: 5px; height: 5px;
+      background: var(--accent-light);
+      border-radius: 50%;
+      animation: bounce 1.2s ease infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    /* ── Input Bar ─────────────────────────────────────────────────────── */
+    #input-area {
+      grid-area: input;
+      padding: 12px 16px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-soft);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    #msg-input {
+      flex: 1;
+      padding: 11px 16px;
+      background: var(--bg-input);
+      border: 1.5px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 14px;
+      resize: none;
+      outline: none;
+      max-height: 120px;
+      min-height: 44px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      line-height: 1.5;
+      overflow-y: auto;
+    }
+    #msg-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    #msg-input::placeholder { color: var(--text-faint); }
+    #msg-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #btn-send {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: white;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+    #btn-send:hover:not(:disabled) { transform: scale(1.08); box-shadow: 0 6px 20px var(--accent-glow); }
+    #btn-send:active:not(:disabled) { transform: scale(0.96); }
+    #btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    #btn-send svg { pointer-events: none; }
+
+    /* ── Sidebar ────────────────────────────────────────────────────────── */
+    #sidebar {
+      grid-area: sidebar;
+      background: var(--bg-sidebar);
+      border-left: 1px solid var(--border-soft);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 16px 14px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    #user-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .user-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      transition: background 0.15s ease;
+      cursor: default;
+      animation: fadeIn 0.3s ease;
+    }
+    .user-item:hover { background: var(--border-soft); }
+    .user-item.me    { color: var(--accent-light); }
+
+    .user-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--online);
+      flex-shrink: 0;
+      box-shadow: 0 0 6px rgba(16,185,129,0.5);
+    }
+
+    .sidebar-footer {
+      padding: 14px;
+      border-top: 1px solid var(--border-soft);
+      text-align: center;
+    }
+    .sidebar-footer p {
+      font-size: 10px;
+      color: var(--text-faint);
+      line-height: 1.6;
+    }
+    .sidebar-footer .credit-name { color: var(--accent-light); font-weight: 600; }
+
+    /* ── Notification Badge ─────────────────────────────────────────────── */
+    #unread-badge {
+      position: fixed;
+      top: 70px;
+      right: 230px;
+      background: var(--accent);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: var(--radius-pill);
+      display: none;
+      animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    #unread-badge.visible { display: block; }
+
+    /* ── Keyframes ──────────────────────────────────────────────────────── */
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px) scale(0.96); } to { opacity: 1; transform: none; } }
+    @keyframes msgIn   { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+    @keyframes pulse   { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes bounce  { 0%,80%,100% { transform: scale(1); } 40% { transform: scale(1.4); } }
+    @keyframes shake   { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+    @keyframes pop     { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* ── Mobile Responsive ──────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+        grid-template-areas:
+          "header"
+          "chat"
+          "input";
+      }
+      #sidebar { display: none; }
+      #unread-badge { right: 16px; }
+      .msg-wrapper { max-width: 88%; }
+      #login-card { margin: 16px; padding: 28px 22px 24px; }
+    }
+
+    @media (max-width: 400px) {
+      #header { padding: 0 12px; }
+      .header-title { font-size: 16px; }
+      .header-subtitle { display: none; }
+    }
+
+    /* ── Connection Status Banner ───────────────────────────────────────── */
+    #conn-banner {
+      background: rgba(239,68,68,0.12);
+      border-bottom: 1px solid rgba(239,68,68,0.25);
+      color: #fca5a5;
+      font-size: 12px;
+      text-align: center;
+      padding: 6px;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    #conn-banner.show { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- ──────────────────────── LOGIN OVERLAY ──────────────────────────── -->
+<div id="login-overlay" role="dialog" aria-modal="true" aria-label="Join YusufChat">
+  <div id="login-card">
+    <div class="login-logo">
+      <div class="y-icon" aria-hidden="true">Y</div>
+      <div>
+        <h1>YusufChat</h1>
+        <div class="tagline">Connect Instantly ✨</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="inp-username">Your Name</label>
+      <input type="text" id="inp-username" placeholder="Enter your display name…" maxlength="30" autocomplete="nickname" autocapitalize="words" spellcheck="false" />
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="inp-host">Server Host</label>
+        <input type="text" id="inp-host" placeholder="amiable-clarity-production-8f65.up.railway.app" value="amiable-clarity-production-8f65.up.railway.app" spellcheck="false" />
+      </div>
+      <div class="form-group">
+        <label for="inp-port">Port</label>
+        <input type="number" id="inp-port" placeholder="443" value="443" min="1" max="65535" />
+      </div>
+    </div>
+
+    <button id="btn-join" type="button">Join Chat →</button>
+    <div id="login-error" role="alert" aria-live="polite"></div>
+
+    <div class="login-footer">
+      Made by <strong>Mohd Yusuf</strong> | BBD NIIT Lucknow
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────── MAIN APP ──────────────────────────────── -->
+<div id="app">
+
+  <!-- Header -->
+  <header id="header" role="banner">
+    <div class="header-left">
+      <svg class="header-logo" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+        <circle cx="18" cy="18" r="18" fill="url(#g1)"/>
+        <text x="18" y="23" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="16" fill="white">Y</text>
+        <defs>
+          <linearGradient id="g1" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#6366f1"/>
+            <stop offset="1" stop-color="#4f46e5"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div>
+        <div class="header-title">YusufChat</div>
+        <div class="header-subtitle">Connect Instantly</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div style="display:flex;align-items:center;">
+        <span id="status-dot" class="connecting" aria-hidden="true"></span>
+        <span id="status-text">Connecting…</span>
+      </div>
+      <span id="online-count">0 online</span>
+    </div>
+  </header>
+
+  <!-- Connection error banner -->
+  <div id="conn-banner" role="status" aria-live="polite"></div>
+
+  <!-- Chat messages -->
+  <main id="chat-area" role="log" aria-live="polite" aria-label="Chat messages"></main>
+
+  <!-- Typing bar (layered over chat-area bottom) -->
+  <div id="typing-bar" aria-live="polite" aria-atomic="true">
+    <div id="typing-text" aria-label="Typing indicator">
+      <div class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      <span id="typing-msg"></span>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <footer id="input-area" role="contentinfo">
+    <textarea id="msg-input" placeholder="Type a message… (Enter to send)" rows="1" disabled aria-label="Message input" aria-describedby="typing-text"></textarea>
+    <button id="btn-send" disabled aria-label="Send message" title="Send">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </footer>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" aria-label="Online users">
+    <div class="sidebar-header">Online Users</div>
+    <div id="user-list" role="list" aria-label="Online users"></div>
+    <div class="sidebar-footer">
+      <p>Made by<br><span class="credit-name">Mohd Yusuf</span><br>BBD NIIT Lucknow</p>
+    </div>
+  </aside>
+</div>
+
+<!-- Unread badge -->
+<div id="unread-badge" role="status" aria-live="polite" title="New messages — click to scroll down"></div>
+
+<script>
+  /* ════════════════════════════════════════════════════════════════════
+   *  YusufChat — Web Frontend
+   *  Made by Mohd Yusuf | BBD NIIT Lucknow
+   * ════════════════════════════════════════════════════════════════════ */
+
+  'use strict';
+
+  // ── Notification Sound (subtle chime via Web Audio API) ───────────────
+  function playChime() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1108, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } catch (_) {}
+  }
+
+  // ── State ─────────────────────────────────────────────────────────────
+  let ws            = null;
+  let myUsername    = '';
+  let typingTimer   = null;
+  let typingUsers   = new Set();
+  let unreadCount   = 0;
+  let isScrolledToBottom = true;
+  let reconnectTimeout   = null;
+  let reconnectDelay     = 1500;
+  let serverHost    = 'amiable-clarity-production-8f65.up.railway.app';
+  let serverPort    = '443';
+  let shouldReconnect = true;
+
+  // ── DOM ───────────────────────────────────────────────────────────────
+  const $login    = document.getElementById('login-overlay');
+  const $inpName  = document.getElementById('inp-username');
+  const $inpHost  = document.getElementById('inp-host');
+  const $inpPort  = document.getElementById('inp-port');
+  const $btnJoin  = document.getElementById('btn-join');
+  const $loginErr = document.getElementById('login-error');
+  const $chatArea = document.getElementById('chat-area');
+  const $msgInput = document.getElementById('msg-input');
+  const $btnSend  = document.getElementById('btn-send');
+  const $userList = document.getElementById('user-list');
+  const $statusDot  = document.getElementById('status-dot');
+  const $statusText = document.getElementById('status-text');
+  const $onlineCount = document.getElementById('online-count');
+  const $typingText  = document.getElementById('typing-text');
+  const $typingMsg   = document.getElementById('typing-msg');
+  const $unreadBadge = document.getElementById('unread-badge');
+  const $connBanner  = document.getElementById('conn-banner');
+
+  // ── Login ─────────────────────────────────────────────────────────────
+  $inpName.focus();
+
+  $btnJoin.addEventListener('click', doJoin);
+  [$inpName, $inpHost, $inpPort].forEach(el => el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doJoin();
+  }));
+
+  function doJoin() {
+    const name = $inpName.value.trim();
+    if (!name) {
+      showLoginError('Please enter your display name!');
+      $inpName.focus();
+      return;
+    }
+    if (name.length > 30) {
+      showLoginError('Name must be 30 characters or fewer.');
+      return;
+    }
+    myUsername = name;
+    serverHost = $inpHost.value.trim() || 'localhost';
+    serverPort = $inpPort.value.trim() || '443';
+
+    $login.classList.add('hidden');
+    connectWS();
+  }
+
+  function showLoginError(msg) {
+    $loginErr.textContent = msg;
+    $loginErr.classList.remove('show');
+    void $loginErr.offsetWidth; // force reflow for animation replay
+    $loginErr.classList.add('show');
+  }
+
+  // ── WebSocket ─────────────────────────────────────────────────────────
+  function connectWS() {
+    shouldReconnect = true;
+    setStatus('connecting', 'Connecting…');
+
+    try {
+      // Use wss:// for Railway (TLS terminated at proxy); ws:// for local servers
+      const isLocal = serverHost === 'localhost' || serverHost === '127.0.0.1';
+      const proto = isLocal ? 'ws' : 'wss';
+      // Omit port for standard ports (80/443) so the URL is clean; include for custom ports
+      const port = parseInt(serverPort, 10);
+      const isStandardPort = (!isLocal && port === 443) || (isLocal && port === 80);
+      const portSuffix = isStandardPort ? '' : `:${serverPort}`;
+      ws = new WebSocket(`${proto}://${serverHost}${portSuffix}`);
+    } catch (e) {
+      showBanner('Unable to connect: ' + e.message);
+      scheduleReconnect();
+      return;
+    }
+
+    ws.addEventListener('open', () => {
+      reconnectDelay = 1500;
+      setStatus('online', 'Connected');
+      hideBanner();
+      enableInput(true);
+      send({ type: 'join', username: myUsername });
+    });
+
+    ws.addEventListener('message', evt => {
+      try {
+        const data = JSON.parse(evt.data);
+        handleMessage(data);
+      } catch (_) {}
+    });
+
+    ws.addEventListener('close', () => {
+      enableInput(false);
+      if (shouldReconnect) {
+        setStatus('offline', 'Disconnected');
+        showBanner(`Disconnected. Reconnecting in ${reconnectDelay / 1000}s…`);
+        scheduleReconnect();
+      }
+    });
+
+    ws.addEventListener('error', () => {
+      // close event will fire next
+    });
+  }
+
+  function scheduleReconnect() {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = setTimeout(() => {
+      connectWS();
+      reconnectDelay = Math.min(reconnectDelay * 1.6, 15000);
+    }, reconnectDelay);
+  }
+
+  function send(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(obj));
+    }
+  }
+
+  // ── Message Handling ──────────────────────────────────────────────────
+  function handleMessage(data) {
+    switch (data.type) {
+      case 'message':
+      case 'join':
+      case 'leave':
+      case 'welcome':
+        appendMessage(data);
+        break;
+      case 'userList':
+        renderUserList(data.users);
+        break;
+      case 'typing':
+        if (data.username !== myUsername) showTyping(data.username);
+        break;
+      case 'stopTyping':
+        if (data.username !== myUsername) clearTyping(data.username);
+        break;
+    }
+  }
+
+  function appendMessage(data) {
+    const isOwn    = data.username === myUsername;
+    const isSystem = data.type === 'join' || data.type === 'leave' || data.type === 'welcome';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'msg-wrapper ' + (isSystem ? 'system' : isOwn ? 'own' : 'other');
+
+    if (!isOwn && !isSystem) {
+      const sender = document.createElement('div');
+      sender.className = 'msg-sender';
+      sender.textContent = data.username;
+      wrapper.appendChild(sender);
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = data.text;
+    wrapper.appendChild(bubble);
+
+    if (!isSystem) {
+      const time = document.createElement('div');
+      time.className = 'msg-time';
+      time.textContent = data.time || formatTime();
+      wrapper.appendChild(time);
+    }
+
+    $chatArea.appendChild(wrapper);
+
+    // Scroll and unread handling
+    if (isScrolledToBottom) {
+      scrollToBottom();
+    } else if (!isOwn && !isSystem) {
+      unreadCount++;
+      $unreadBadge.textContent = `↓ ${unreadCount} new message${unreadCount > 1 ? 's' : ''}`;
+      $unreadBadge.classList.add('visible');
+    }
+
+    // Sound for incoming messages
+    if (!isOwn && !isSystem) {
+      playChime();
+    }
+  }
+
+  // ── Scroll ────────────────────────────────────────────────────────────
+  function scrollToBottom() {
+    $chatArea.scrollTop = $chatArea.scrollHeight;
+  }
+
+  $chatArea.addEventListener('scroll', () => {
+    const threshold = 80;
+    isScrolledToBottom = $chatArea.scrollHeight - $chatArea.scrollTop - $chatArea.clientHeight < threshold;
+    if (isScrolledToBottom) {
+      unreadCount = 0;
+      $unreadBadge.classList.remove('visible');
+    }
+  });
+
+  $unreadBadge.addEventListener('click', () => {
+    scrollToBottom();
+    unreadCount = 0;
+    $unreadBadge.classList.remove('visible');
+  });
+
+  // ── User List ─────────────────────────────────────────────────────────
+  function renderUserList(users) {
+    $userList.innerHTML = '';
+    $onlineCount.textContent = `${users.length} online`;
+    users.forEach(u => {
+      const item = document.createElement('div');
+      item.className = 'user-item' + (u === myUsername ? ' me' : '');
+      item.setAttribute('role', 'listitem');
+      item.innerHTML = `<div class="user-dot" aria-hidden="true"></div><span>${escHtml(u)}${u === myUsername ? ' (you)' : ''}</span>`;
+      $userList.appendChild(item);
+    });
+  }
+
+  // ── Typing Indicator ──────────────────────────────────────────────────
+  function showTyping(user) {
+    typingUsers.add(user);
+    updateTypingUI();
+
+    // Auto-clear after 4s if stopTyping never arrives
+    setTimeout(() => clearTyping(user), 4000);
+  }
+
+  function clearTyping(user) {
+    typingUsers.delete(user);
+    updateTypingUI();
+  }
+
+  function updateTypingUI() {
+    if (typingUsers.size === 0) {
+      $typingText.classList.remove('visible');
+      $typingMsg.textContent = '';
+      return;
+    }
+    const list = [...typingUsers];
+    const text = list.length === 1
+      ? `${list[0]} is typing`
+      : list.length === 2
+        ? `${list[0]} and ${list[1]} are typing`
+        : `${list.length} people are typing`;
+    $typingMsg.textContent = text + '…';
+    $typingText.classList.add('visible');
+  }
+
+  // ── Input & Send ──────────────────────────────────────────────────────
+  function enableInput(enabled) {
+    $msgInput.disabled = !enabled;
+    $btnSend.disabled  = !enabled;
+    if (enabled) $msgInput.focus();
+  }
+
+  function sendMessage() {
+    const text = $msgInput.value.trim();
+    if (!text) return;
+    send({ type: 'message', username: myUsername, text });
+    $msgInput.value = '';
+    autoResize($msgInput);
+    clearTimeout(typingTimer);
+    send({ type: 'stopTyping', username: myUsername });
+  }
+
+  $btnSend.addEventListener('click', sendMessage);
+
+  $msgInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Auto-resize textarea
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    isScrolledToBottom = $chatArea.scrollHeight - $chatArea.scrollTop - $chatArea.clientHeight < 80;
+    if (isScrolledToBottom) scrollToBottom();
+  }
+  $msgInput.addEventListener('input', () => {
+    autoResize($msgInput);
+
+    // Typing signal
+    send({ type: 'typing', username: myUsername });
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      send({ type: 'stopTyping', username: myUsername });
+    }, 2000);
+  });
+
+  // ── Status UI ─────────────────────────────────────────────────────────
+  function setStatus(state, text) {
+    $statusDot.className = state;
+    $statusText.textContent = text;
+  }
+
+  function showBanner(msg) {
+    $connBanner.textContent = msg;
+    $connBanner.classList.add('show');
+  }
+
+  function hideBanner() {
+    $connBanner.classList.remove('show');
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────
+  function formatTime() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function escHtml(s) {
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+  }
+
+  // ── Page Visibility API (pause/resume reconnect) ──────────────────────
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && ws && ws.readyState !== WebSocket.OPEN && shouldReconnect) {
+      clearTimeout(reconnectTimeout);
+      connectWS();
+    }
+  });
+
+  // ── Title Unread Count ─────────────────────────────────────────────────
+  const originalTitle = document.title;
+  setInterval(() => {
+    if (unreadCount > 0 && document.hidden) {
+      document.title = document.title === originalTitle
+        ? `(${unreadCount}) New messages — YusufChat`
+        : originalTitle;
+    } else {
+      document.title = originalTitle;
+    }
+  }, 1500);
+</script>
+</body>
+</html>
