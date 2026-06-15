@@ -1,15 +1,5 @@
 services:
-  # ── Backend: Java WebSocket Server ────────────────────────────────────────
-  - type: web
-    name: yusufchat-server
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    envVars:
-      - key: PORT
-        value: 10000
-    healthCheckPath: /
-
-  # ── Frontend: Static Site ──────────────────────────────────────────────────
+  # ── Frontend: Static Site (FREE — no credit card required) ─────────────────
   - type: web
     name: yusufchat-web
     runtime: static
@@ -18,3 +8,6 @@ services:
       - path: /*
         name: X-Frame-Options
         value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
