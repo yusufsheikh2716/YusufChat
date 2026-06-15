@@ -656,17 +656,14 @@
   let typingUsers   = new Set();
   let unreadCount   = 0;
   let isScrolledToBottom = true;
-  let reconnectTimeout   = null;
-  let reconnectDelay     = 1500;
-  let serverHost    = 'amiable-clarity-production-8f65.up.railway.app';
-  let serverPort    = '443';
-  let shouldReconnect = true;
+  let myClientId   = 'user_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now();
+  let db = null, msgsRef = null, presenceRef = null, typingRef = null;
+  let myPresRef = null, myTypingRef = null, seenMsgKeys = new Set();
 
   // ── DOM ───────────────────────────────────────────────────────────────
   const $login    = document.getElementById('login-overlay');
   const $inpName  = document.getElementById('inp-username');
-  const $inpHost  = document.getElementById('inp-host');
-  const $inpPort  = document.getElementById('inp-port');
+  const $inpFbUrl = document.getElementById('inp-fburl');
   const $btnJoin  = document.getElementById('btn-join');
   const $loginErr = document.getElementById('login-error');
   const $chatArea = document.getElementById('chat-area');
@@ -685,27 +682,22 @@
   $inpName.focus();
 
   $btnJoin.addEventListener('click', doJoin);
-  [$inpName, $inpHost, $inpPort].forEach(el => el.addEventListener('keydown', e => {
+  [$inpName, $inpFbUrl].forEach(el => el.addEventListener('keydown', e => {
     if (e.key === 'Enter') doJoin();
   }));
 
   function doJoin() {
-    const name = $inpName.value.trim();
-    if (!name) {
-      showLoginError('Please enter your display name!');
-      $inpName.focus();
-      return;
-    }
-    if (name.length > 30) {
-      showLoginError('Name must be 30 characters or fewer.');
-      return;
+    const name  = $inpName.value.trim();
+    const fbUrl = ($inpFbUrl ? $inpFbUrl.value.trim() : '');
+    if (!name) { showLoginError('Please enter your display name!'); $inpName.focus(); return; }
+    if (name.length > 30) { showLoginError('Name must be 30 characters or fewer.'); return; }
+    if (!fbUrl || !fbUrl.startsWith('https://')) {
+      showLoginError('Please enter your Firebase Database URL!');
+      if ($inpFbUrl) $inpFbUrl.focus(); return;
     }
     myUsername = name;
-    serverHost = $inpHost.value.trim() || 'localhost';
-    serverPort = $inpPort.value.trim() || '443';
-
     $login.classList.add('hidden');
-    connectWS();
+    connectFirebase(fbUrl);
   }
 
   function showLoginError(msg) {
