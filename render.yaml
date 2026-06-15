@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  render.yaml — Render Blueprint
+#  Deploys YusufChat as two services:
+#    1. yusufchat-server  → Web Service  (Docker, Java WebSocket backend)
+#    2. yusufchat-web     → Static Site  (web/index.html)
+#
+#  Made by Mohd Yusuf | BBD NIIT Lucknow
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Backend: Java WebSocket Server ────────────────────────────────────────
+  - type: web
+    name: yusufchat-server
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # Render's free tier spins down after 15 min inactivity.
+    # The frontend reconnect logic handles wake-up automatically.
+    plan: free
+    envVars:
+      # Render injects PORT automatically (default 10000).
+      # Declaring it here makes it visible in the dashboard.
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
+
+  # ── Frontend: Static Site ──────────────────────────────────────────────────
+  - type: web
+    name: yusufchat-web
+    runtime: static
+    staticPublishPath: ./web
+    plan: free
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

@@ -407,6 +407,7 @@ public class ChatServer {
             // Allow known origins; fall back to * for non-browser clients
             String allowedOrigin;
             if (origin.equals("https://yusufchat.netlify.app") ||
+                origin.equals("https://yusufchat-web.onrender.com") ||
                 origin.equals("http://localhost:3000") ||
                 origin.startsWith("http://localhost:") ||
                 origin.startsWith("http://127.0.0.1:")) {

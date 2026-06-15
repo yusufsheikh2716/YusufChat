@@ -14,13 +14,14 @@ LABEL description="YusufChat Server — Real-time WebSocket + TCP Chat"
 WORKDIR /app
 COPY --from=builder /app/*.class .
 
-# Railway injects PORT env var — this is the port the WebSocket server listens on.
-# The value Railway assigns is typically in the range 1024-65535.
-# We declare a default so the image works locally too.
-ENV PORT=8080
+# Render injects PORT env var (default 10000).
+# Railway also injects PORT (typically 8080 range).
+# The Java server reads PORT via System.getenv("PORT") with fallback to 10000.
+ENV PORT=10000
 
-# Expose the WebSocket port (Railway overrides this at runtime via PORT env var)
-EXPOSE 8080
+# Expose the port Render will route traffic to.
+# Render ignores EXPOSE for routing (uses PORT env var), but it's good documentation.
+EXPOSE 10000
 
 # Run the chat server
 CMD ["java", "ChatServer"]
