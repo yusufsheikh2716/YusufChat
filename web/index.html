@@ -626,69 +626,53 @@
 
 <script>
   /* ════════════════════════════════════════════════════════════════════
-   *  YusufChat — Web Frontend
+   *  YusufChat — Web Frontend (Firebase Realtime Database)
    *  Made by Mohd Yusuf | BBD NIIT Lucknow
    * ════════════════════════════════════════════════════════════════════ */
-
   'use strict';
 
-  // ── Notification Sound (subtle chime via Web Audio API) ───────────────
   function playChime() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
       osc.frequency.setValueAtTime(880, ctx.currentTime);
       osc.frequency.setValueAtTime(1108, ctx.currentTime + 0.08);
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4);
     } catch (_) {}
   }
 
-  // ── State ─────────────────────────────────────────────────────────────
-  let ws            = null;
-  let myUsername    = '';
-  let typingTimer   = null;
-  let typingUsers   = new Set();
-  let unreadCount   = 0;
-  let isScrolledToBottom = true;
-  let myClientId   = 'user_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now();
+  let myUsername = '', myClientId = 'u_' + Math.random().toString(36).slice(2,9) + '_' + Date.now();
+  let typingTimer = null, typingUsers = new Set(), unreadCount = 0, isScrolledToBottom = true;
   let db = null, msgsRef = null, presenceRef = null, typingRef = null;
   let myPresRef = null, myTypingRef = null, seenMsgKeys = new Set();
 
-  // ── DOM ───────────────────────────────────────────────────────────────
-  const $login    = document.getElementById('login-overlay');
-  const $inpName  = document.getElementById('inp-username');
-  const $inpFbUrl = document.getElementById('inp-fburl');
-  const $btnJoin  = document.getElementById('btn-join');
-  const $loginErr = document.getElementById('login-error');
-  const $chatArea = document.getElementById('chat-area');
-  const $msgInput = document.getElementById('msg-input');
-  const $btnSend  = document.getElementById('btn-send');
-  const $userList = document.getElementById('user-list');
-  const $statusDot  = document.getElementById('status-dot');
-  const $statusText = document.getElementById('status-text');
+  const $login       = document.getElementById('login-overlay');
+  const $inpName     = document.getElementById('inp-username');
+  const $inpFbUrl    = document.getElementById('inp-fburl');
+  const $btnJoin     = document.getElementById('btn-join');
+  const $loginErr    = document.getElementById('login-error');
+  const $chatArea    = document.getElementById('chat-area');
+  const $msgInput    = document.getElementById('msg-input');
+  const $btnSend     = document.getElementById('btn-send');
+  const $userList    = document.getElementById('user-list');
+  const $statusDot   = document.getElementById('status-dot');
+  const $statusText  = document.getElementById('status-text');
   const $onlineCount = document.getElementById('online-count');
   const $typingText  = document.getElementById('typing-text');
   const $typingMsg   = document.getElementById('typing-msg');
   const $unreadBadge = document.getElementById('unread-badge');
   const $connBanner  = document.getElementById('conn-banner');
 
-  // ── Login ─────────────────────────────────────────────────────────────
   $inpName.focus();
-
   $btnJoin.addEventListener('click', doJoin);
-  [$inpName, $inpFbUrl].forEach(el => el.addEventListener('keydown', e => {
-    if (e.key === 'Enter') doJoin();
-  }));
+  [$inpName, $inpFbUrl].forEach(el => el && el.addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); }));
 
   function doJoin() {
-    const name  = $inpName.value.trim();
-    const fbUrl = ($inpFbUrl ? $inpFbUrl.value.trim() : '');
+    const name = $inpName.value.trim();
+    const fbUrl = $inpFbUrl ? $inpFbUrl.value.trim() : '';
     if (!name) { showLoginError('Please enter your display name!'); $inpName.focus(); return; }
     if (name.length > 30) { showLoginError('Name must be 30 characters or fewer.'); return; }
     if (!fbUrl || !fbUrl.startsWith('https://')) {
@@ -707,68 +691,54 @@
     $loginErr.classList.add('show');
   }
 
-  // ── Firebase Connection ────────────────────────────────────────────────
   function connectFirebase(dbUrl) {
-    setStatus('connecting', 'Connecting…');
-
-    const script1 = document.createElement('script');
-    script1.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
-    script1.onload = () => {
-      const script2 = document.createElement('script');
-      script2.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
-      script2.onload = () => initFirebase(dbUrl);
-      script2.onerror = () => showBanner('Failed to load Firebase SDK.');
-      document.head.appendChild(script2);
+    setStatus('connecting', 'Connecting...');
+    const s1 = document.createElement('script');
+    s1.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+    s1.onload = () => {
+      const s2 = document.createElement('script');
+      s2.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
+      s2.onload = () => initFirebase(dbUrl);
+      s2.onerror = () => { showBanner('Failed to load Firebase SDK.'); $login.classList.remove('hidden'); };
+      document.head.appendChild(s2);
     };
-    script1.onerror = () => showBanner('Failed to load Firebase SDK.');
-    document.head.appendChild(script1);
+    s1.onerror = () => { showBanner('Failed to load Firebase SDK.'); $login.classList.remove('hidden'); };
+    document.head.appendChild(s1);
   }
 
   function initFirebase(dbUrl) {
     try {
-      const app = firebase.initializeApp({
-        databaseURL: dbUrl,
-      });
+      const app = firebase.initializeApp({ databaseURL: dbUrl });
       db = firebase.database(app);
-    } catch(e) {
-      showBanner('Firebase init error: ' + e.message);
-      return;
+    } catch (e) {
+      showBanner('Firebase error: ' + e.message);
+      $login.classList.remove('hidden'); return;
     }
-
-    msgsRef     = db.ref('yusufchat/messages');
+    msgsRef = db.ref('yusufchat/messages');
     presenceRef = db.ref('yusufchat/presence');
-    typingRef   = db.ref('yusufchat/typing');
-    myPresRef   = presenceRef.child(myClientId);
+    typingRef = db.ref('yusufchat/typing');
+    myPresRef = presenceRef.child(myClientId);
     myTypingRef = typingRef.child(myClientId);
 
-    myPresRef.set({ username: myUsername, online: true });
+    myPresRef.set({ username: myUsername });
     myPresRef.onDisconnect().remove();
     myTypingRef.onDisconnect().remove();
 
     presenceRef.on('value', snap => {
       const users = [];
-      snap.forEach(child => {
-        const u = child.val();
-        if (u && u.username) users.push(u.username);
-      });
+      snap.forEach(c => { const v = c.val(); if (v && v.username) users.push(v.username); });
       renderUserList(users);
     });
 
     typingRef.on('value', snap => {
       typingUsers.clear();
-      snap.forEach(child => {
-        const t = child.val();
-        if (t && t.username && t.username !== myUsername) typingUsers.add(t.username);
-      });
+      snap.forEach(c => { const v = c.val(); if (v && v.username && v.username !== myUsername) typingUsers.add(v.username); });
       updateTypingUI();
     });
 
     msgsRef.limitToLast(50).once('value', snap => {
-      const history = [];
-      snap.forEach(child => { history.push({ key: child.key, val: child.val() }); });
-      history.forEach(({ key, val }) => { seenMsgKeys.add(key); appendMessage(val, true); });
+      snap.forEach(c => { seenMsgKeys.add(c.key); appendMessage(c.val(), true); });
       scrollToBottom();
-
       msgsRef.limitToLast(1).on('child_added', snap => {
         if (seenMsgKeys.has(snap.key)) return;
         seenMsgKeys.add(snap.key);
@@ -776,76 +746,46 @@
       });
     });
 
-    setStatus('online', 'Connected');
-    hideBanner();
-    enableInput(true);
-
-    msgsRef.push({
-      type: 'join', username: myUsername,
-      text: myUsername + ' joined the chat 🎉',
-      time: formatTime(), ts: firebase.database.ServerValue.TIMESTAMP
-    });
-
-    appendMessage({ type: 'welcome', username: 'YusufChat',
-      text: 'Welcome to YusufChat, ' + myUsername + '! 👋', time: formatTime() }, true);
-
-    window.addEventListener('beforeunload', () => {
-      myPresRef.remove(); myTypingRef.remove();
-    });
-
     db.ref('.info/connected').on('value', snap => {
-      if (snap.val() === true) { setStatus('online', 'Connected'); hideBanner(); }
-      else { setStatus('offline', 'Reconnecting…'); showBanner('Connection lost.'); }
+      if (snap.val()) { setStatus('online', 'Connected'); hideBanner(); }
+      else { setStatus('offline', 'Reconnecting...'); showBanner('Connection lost. Reconnecting...'); }
     });
+
+    enableInput(true);
+    msgsRef.push({ type: 'join', username: myUsername, text: myUsername + ' joined the chat!',
+      time: formatTime(), ts: firebase.database.ServerValue.TIMESTAMP });
+    appendMessage({ type: 'welcome', username: 'YusufChat',
+      text: 'Welcome, ' + myUsername + '! Start chatting below.', time: formatTime() }, true);
+    window.addEventListener('beforeunload', () => { myPresRef.remove(); myTypingRef.remove(); });
   }
 
   function sendChatMessage() {
     const text = $msgInput.value.trim();
     if (!text || !msgsRef) return;
-    msgsRef.push({ type: 'message', username: myUsername,
-      text: text.substring(0, 2000), time: formatTime(),
-      ts: firebase.database.ServerValue.TIMESTAMP });
-    $msgInput.value = '';
-    autoResize($msgInput);
-    clearTimeout(typingTimer);
-    if (myTypingRef) myTypingRef.remove();
+    msgsRef.push({ type: 'message', username: myUsername, text: text.substring(0, 2000),
+      time: formatTime(), ts: firebase.database.ServerValue.TIMESTAMP });
+    $msgInput.value = ''; autoResize($msgInput);
+    clearTimeout(typingTimer); if (myTypingRef) myTypingRef.remove();
   }
 
+  $btnSend.addEventListener('click', sendChatMessage);
+  $msgInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
+  $msgInput.addEventListener('input', () => {
+    autoResize($msgInput);
+    if (myTypingRef) { myTypingRef.set({ username: myUsername }); clearTimeout(typingTimer); typingTimer = setTimeout(() => { if (myTypingRef) myTypingRef.remove(); }, 2500); }
+  });
+
   function appendMessage(data, isHistory) {
-    const isOwn    = data.username === myUsername;
-    const isSystem = data.type === 'join' || data.type === 'leave' || data.type === 'welcome';
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'msg-wrapper ' + (isSystem ? 'system' : isOwn ? 'own' : 'other');
-
-    if (!isOwn && !isSystem) {
-      const sender = document.createElement('div');
-      sender.className = 'msg-sender';
-      sender.textContent = data.username;
-      wrapper.appendChild(sender);
-    }
-
-    const bubble = document.createElement('div');
-    bubble.className = 'msg-bubble';
-    bubble.textContent = data.text;
-    wrapper.appendChild(bubble);
-
-    if (!isSystem) {
-      const time = document.createElement('div');
-      time.className = 'msg-time';
-      time.textContent = data.time || formatTime();
-      wrapper.appendChild(time);
-    }
-
-    $chatArea.appendChild(wrapper);
-
-    if (isScrolledToBottom) {
-      scrollToBottom();
-    } else if (!isOwn && !isSystem && !isHistory) {
-      unreadCount++;
-      $unreadBadge.textContent = `↓ ${unreadCount} new message${unreadCount > 1 ? 's' : ''}`;
-      $unreadBadge.classList.add('visible');
-    }
+    const isOwn = data.username === myUsername;
+    const isSystem = ['join','leave','welcome'].includes(data.type);
+    const w = document.createElement('div');
+    w.className = 'msg-wrapper ' + (isSystem ? 'system' : isOwn ? 'own' : 'other');
+    if (!isOwn && !isSystem) { const s = document.createElement('div'); s.className = 'msg-sender'; s.textContent = data.username; w.appendChild(s); }
+    const b = document.createElement('div'); b.className = 'msg-bubble'; b.textContent = data.text; w.appendChild(b);
+    if (!isSystem) { const t = document.createElement('div'); t.className = 'msg-time'; t.textContent = data.time || formatTime(); w.appendChild(t); }
+    $chatArea.appendChild(w);
+    if (isScrolledToBottom) scrollToBottom();
+    else if (!isOwn && !isSystem && !isHistory) { unreadCount++; $unreadBadge.textContent = String.fromCharCode(8595) + ' ' + unreadCount + ' new message' + (unreadCount > 1 ? 's' : ''); $unreadBadge.classList.add('visible'); }
     if (!isOwn && !isSystem && !isHistory) playChime();
   }
 
@@ -854,134 +794,38 @@
     isScrolledToBottom = $chatArea.scrollHeight - $chatArea.scrollTop - $chatArea.clientHeight < 80;
     if (isScrolledToBottom) { unreadCount = 0; $unreadBadge.classList.remove('visible'); }
   });
-  $unreadBadge.addEventListener('click', () => {
-    scrollToBottom(); unreadCount = 0; $unreadBadge.classList.remove('visible');
-  });
+  $unreadBadge.addEventListener('click', () => { scrollToBottom(); unreadCount = 0; $unreadBadge.classList.remove('visible'); });
 
   function renderUserList(users) {
     $userList.innerHTML = '';
-    $onlineCount.textContent = `${users.length} online`;
+    $onlineCount.textContent = users.length + ' online';
     users.forEach(u => {
       const item = document.createElement('div');
       item.className = 'user-item' + (u === myUsername ? ' me' : '');
       item.setAttribute('role', 'listitem');
-      item.innerHTML = `<div class="user-dot" aria-hidden="true"></div><span>${escHtml(u)}${u === myUsername ? ' (you)' : ''}</span>`;
-      $userList.appendChild(item);
+      const dot = document.createElement('div'); dot.className = 'user-dot'; dot.setAttribute('aria-hidden','true');
+      const span = document.createElement('span'); span.textContent = u + (u === myUsername ? ' (you)' : '');
+      item.appendChild(dot); item.appendChild(span); $userList.appendChild(item);
     });
   }
 
-  }
-
-  function clearTyping(user) {
-    typingUsers.delete(user);
-    updateTypingUI();
-  }
-
   function updateTypingUI() {
-    if (typingUsers.size === 0) {
-      $typingText.classList.remove('visible');
-      $typingMsg.textContent = '';
-      return;
-    }
+    if (!typingUsers.size) { $typingText.classList.remove('visible'); $typingMsg.textContent = ''; return; }
     const list = [...typingUsers];
-    const text = list.length === 1
-      ? `${list[0]} is typing`
-      : list.length === 2
-        ? `${list[0]} and ${list[1]} are typing`
-        : `${list.length} people are typing`;
-    $typingMsg.textContent = text + '…';
+    $typingMsg.textContent = (list.length === 1 ? list[0] + ' is typing' : list.length === 2 ? list[0] + ' and ' + list[1] + ' are typing' : list.length + ' people are typing') + '...';
     $typingText.classList.add('visible');
   }
 
-  // ── Input & Send ──────────────────────────────────────────────────────
-  function enableInput(enabled) {
-    $msgInput.disabled = !enabled;
-    $btnSend.disabled  = !enabled;
-    if (enabled) $msgInput.focus();
-  }
+  function enableInput(on) { $msgInput.disabled = !on; $btnSend.disabled = !on; if (on) $msgInput.focus(); }
+  function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; isScrolledToBottom = $chatArea.scrollHeight - $chatArea.scrollTop - $chatArea.clientHeight < 80; if (isScrolledToBottom) scrollToBottom(); }
+  function setStatus(s, t) { $statusDot.className = s; $statusText.textContent = t; }
+  function showBanner(m) { $connBanner.textContent = m; $connBanner.classList.add('show'); }
+  function hideBanner() { $connBanner.classList.remove('show'); }
+  function formatTime() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function escHtml(s) { const d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
 
-  function sendMessage() {
-    const text = $msgInput.value.trim();
-    if (!text) return;
-    send({ type: 'message', username: myUsername, text });
-    $msgInput.value = '';
-    autoResize($msgInput);
-    clearTimeout(typingTimer);
-    send({ type: 'stopTyping', username: myUsername });
-  }
-
-  $btnSend.addEventListener('click', sendMessage);
-
-  $msgInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  // Auto-resize textarea
-  function autoResize(el) {
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-    isScrolledToBottom = $chatArea.scrollHeight - $chatArea.scrollTop - $chatArea.clientHeight < 80;
-    if (isScrolledToBottom) scrollToBottom();
-  }
-  $msgInput.addEventListener('input', () => {
-    autoResize($msgInput);
-
-    // Typing signal
-    send({ type: 'typing', username: myUsername });
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => {
-      send({ type: 'stopTyping', username: myUsername });
-    }, 2000);
-  });
-
-  // ── Status UI ─────────────────────────────────────────────────────────
-  function setStatus(state, text) {
-    $statusDot.className = state;
-    $statusText.textContent = text;
-  }
-
-  function showBanner(msg) {
-    $connBanner.textContent = msg;
-    $connBanner.classList.add('show');
-  }
-
-  function hideBanner() {
-    $connBanner.classList.remove('show');
-  }
-
-  // ── Utilities ─────────────────────────────────────────────────────────
-  function formatTime() {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function escHtml(s) {
-    const d = document.createElement('div');
-    d.appendChild(document.createTextNode(s));
-    return d.innerHTML;
-  }
-
-  // ── Page Visibility API (pause/resume reconnect) ──────────────────────
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && ws && ws.readyState !== WebSocket.OPEN && shouldReconnect) {
-      clearTimeout(reconnectTimeout);
-      connectWS();
-    }
-  });
-
-  // ── Title Unread Count ─────────────────────────────────────────────────
-  const originalTitle = document.title;
-  setInterval(() => {
-    if (unreadCount > 0 && document.hidden) {
-      document.title = document.title === originalTitle
-        ? `(${unreadCount}) New messages — YusufChat`
-        : originalTitle;
-    } else {
-      document.title = originalTitle;
-    }
-  }, 1500);
+  const origTitle = document.title;
+  setInterval(() => { document.title = (unreadCount > 0 && document.hidden) ? (document.title === origTitle ? '(' + unreadCount + ') New - YusufChat' : origTitle) : origTitle; }, 1500);
 </script>
 </body>
 </html>
