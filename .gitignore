@@ -1,0 +1,20 @@
+# Java build artifacts
+*.class
+*.jar
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Netlify local state
+.netlify/state.json
+.netlify/v1/
+
+# Logs
+*.log
