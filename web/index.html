@@ -542,15 +542,9 @@
       <input type="text" id="inp-username" placeholder="Enter your display name…" maxlength="30" autocomplete="nickname" autocapitalize="words" spellcheck="false" />
     </div>
 
-    <div class="form-row">
-      <div class="form-group">
-        <label for="inp-host">Server Host</label>
-        <input type="text" id="inp-host" placeholder="amiable-clarity-production-8f65.up.railway.app" value="amiable-clarity-production-8f65.up.railway.app" spellcheck="false" />
-      </div>
-      <div class="form-group">
-        <label for="inp-port">Port</label>
-        <input type="number" id="inp-port" placeholder="443" value="443" min="1" max="65535" />
-      </div>
+    <div class="form-group">
+      <label for="inp-fburl">Firebase Database URL</label>
+      <input type="text" id="inp-fburl" placeholder="https://your-project-default-rtdb.firebaseio.com" spellcheck="false" />
     </div>
 
     <button id="btn-join" type="button">Join Chat →</button>
@@ -717,95 +711,115 @@
   function showLoginError(msg) {
     $loginErr.textContent = msg;
     $loginErr.classList.remove('show');
-    void $loginErr.offsetWidth; // force reflow for animation replay
+    void $loginErr.offsetWidth;
     $loginErr.classList.add('show');
   }
 
-  // ── WebSocket ─────────────────────────────────────────────────────────
-  function connectWS() {
-    shouldReconnect = true;
+  // ── Firebase Connection ────────────────────────────────────────────────
+  function connectFirebase(dbUrl) {
     setStatus('connecting', 'Connecting…');
 
+    const script1 = document.createElement('script');
+    script1.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+    script1.onload = () => {
+      const script2 = document.createElement('script');
+      script2.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
+      script2.onload = () => initFirebase(dbUrl);
+      script2.onerror = () => showBanner('Failed to load Firebase SDK.');
+      document.head.appendChild(script2);
+    };
+    script1.onerror = () => showBanner('Failed to load Firebase SDK.');
+    document.head.appendChild(script1);
+  }
+
+  function initFirebase(dbUrl) {
     try {
-      // Use wss:// for Railway (TLS terminated at proxy); ws:// for local servers
-      const isLocal = serverHost === 'localhost' || serverHost === '127.0.0.1';
-      const proto = isLocal ? 'ws' : 'wss';
-      // Omit port for standard ports (80/443) so the URL is clean; include for custom ports
-      const port = parseInt(serverPort, 10);
-      const isStandardPort = (!isLocal && port === 443) || (isLocal && port === 80);
-      const portSuffix = isStandardPort ? '' : `:${serverPort}`;
-      ws = new WebSocket(`${proto}://${serverHost}${portSuffix}`);
-    } catch (e) {
-      showBanner('Unable to connect: ' + e.message);
-      scheduleReconnect();
+      const app = firebase.initializeApp({
+        databaseURL: dbUrl,
+      });
+      db = firebase.database(app);
+    } catch(e) {
+      showBanner('Firebase init error: ' + e.message);
       return;
     }
 
-    ws.addEventListener('open', () => {
-      reconnectDelay = 1500;
-      setStatus('online', 'Connected');
-      hideBanner();
-      enableInput(true);
-      send({ type: 'join', username: myUsername });
+    msgsRef     = db.ref('yusufchat/messages');
+    presenceRef = db.ref('yusufchat/presence');
+    typingRef   = db.ref('yusufchat/typing');
+    myPresRef   = presenceRef.child(myClientId);
+    myTypingRef = typingRef.child(myClientId);
+
+    myPresRef.set({ username: myUsername, online: true });
+    myPresRef.onDisconnect().remove();
+    myTypingRef.onDisconnect().remove();
+
+    presenceRef.on('value', snap => {
+      const users = [];
+      snap.forEach(child => {
+        const u = child.val();
+        if (u && u.username) users.push(u.username);
+      });
+      renderUserList(users);
     });
 
-    ws.addEventListener('message', evt => {
-      try {
-        const data = JSON.parse(evt.data);
-        handleMessage(data);
-      } catch (_) {}
+    typingRef.on('value', snap => {
+      typingUsers.clear();
+      snap.forEach(child => {
+        const t = child.val();
+        if (t && t.username && t.username !== myUsername) typingUsers.add(t.username);
+      });
+      updateTypingUI();
     });
 
-    ws.addEventListener('close', () => {
-      enableInput(false);
-      if (shouldReconnect) {
-        setStatus('offline', 'Disconnected');
-        showBanner(`Disconnected. Reconnecting in ${reconnectDelay / 1000}s…`);
-        scheduleReconnect();
-      }
+    msgsRef.limitToLast(50).once('value', snap => {
+      const history = [];
+      snap.forEach(child => { history.push({ key: child.key, val: child.val() }); });
+      history.forEach(({ key, val }) => { seenMsgKeys.add(key); appendMessage(val, true); });
+      scrollToBottom();
+
+      msgsRef.limitToLast(1).on('child_added', snap => {
+        if (seenMsgKeys.has(snap.key)) return;
+        seenMsgKeys.add(snap.key);
+        appendMessage(snap.val(), false);
+      });
     });
 
-    ws.addEventListener('error', () => {
-      // close event will fire next
+    setStatus('online', 'Connected');
+    hideBanner();
+    enableInput(true);
+
+    msgsRef.push({
+      type: 'join', username: myUsername,
+      text: myUsername + ' joined the chat 🎉',
+      time: formatTime(), ts: firebase.database.ServerValue.TIMESTAMP
+    });
+
+    appendMessage({ type: 'welcome', username: 'YusufChat',
+      text: 'Welcome to YusufChat, ' + myUsername + '! 👋', time: formatTime() }, true);
+
+    window.addEventListener('beforeunload', () => {
+      myPresRef.remove(); myTypingRef.remove();
+    });
+
+    db.ref('.info/connected').on('value', snap => {
+      if (snap.val() === true) { setStatus('online', 'Connected'); hideBanner(); }
+      else { setStatus('offline', 'Reconnecting…'); showBanner('Connection lost.'); }
     });
   }
 
-  function scheduleReconnect() {
-    clearTimeout(reconnectTimeout);
-    reconnectTimeout = setTimeout(() => {
-      connectWS();
-      reconnectDelay = Math.min(reconnectDelay * 1.6, 15000);
-    }, reconnectDelay);
+  function sendChatMessage() {
+    const text = $msgInput.value.trim();
+    if (!text || !msgsRef) return;
+    msgsRef.push({ type: 'message', username: myUsername,
+      text: text.substring(0, 2000), time: formatTime(),
+      ts: firebase.database.ServerValue.TIMESTAMP });
+    $msgInput.value = '';
+    autoResize($msgInput);
+    clearTimeout(typingTimer);
+    if (myTypingRef) myTypingRef.remove();
   }
 
-  function send(obj) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(obj));
-    }
-  }
-
-  // ── Message Handling ──────────────────────────────────────────────────
-  function handleMessage(data) {
-    switch (data.type) {
-      case 'message':
-      case 'join':
-      case 'leave':
-      case 'welcome':
-        appendMessage(data);
-        break;
-      case 'userList':
-        renderUserList(data.users);
-        break;
-      case 'typing':
-        if (data.username !== myUsername) showTyping(data.username);
-        break;
-      case 'stopTyping':
-        if (data.username !== myUsername) clearTyping(data.username);
-        break;
-    }
-  }
-
-  function appendMessage(data) {
+  function appendMessage(data, isHistory) {
     const isOwn    = data.username === myUsername;
     const isSystem = data.type === 'join' || data.type === 'leave' || data.type === 'welcome';
 
@@ -833,42 +847,25 @@
 
     $chatArea.appendChild(wrapper);
 
-    // Scroll and unread handling
     if (isScrolledToBottom) {
       scrollToBottom();
-    } else if (!isOwn && !isSystem) {
+    } else if (!isOwn && !isSystem && !isHistory) {
       unreadCount++;
       $unreadBadge.textContent = `↓ ${unreadCount} new message${unreadCount > 1 ? 's' : ''}`;
       $unreadBadge.classList.add('visible');
     }
-
-    // Sound for incoming messages
-    if (!isOwn && !isSystem) {
-      playChime();
-    }
+    if (!isOwn && !isSystem && !isHistory) playChime();
   }
 
-  // ── Scroll ────────────────────────────────────────────────────────────
-  function scrollToBottom() {
-    $chatArea.scrollTop = $chatArea.scrollHeight;
-  }
-
+  function scrollToBottom() { $chatArea.scrollTop = $chatArea.scrollHeight; }
   $chatArea.addEventListener('scroll', () => {
-    const threshold = 80;
-    isScrolledToBottom = $chatArea.scrollHeight - $chatArea.scrollTop - $chatArea.clientHeight < threshold;
-    if (isScrolledToBottom) {
-      unreadCount = 0;
-      $unreadBadge.classList.remove('visible');
-    }
+    isScrolledToBottom = $chatArea.scrollHeight - $chatArea.scrollTop - $chatArea.clientHeight < 80;
+    if (isScrolledToBottom) { unreadCount = 0; $unreadBadge.classList.remove('visible'); }
   });
-
   $unreadBadge.addEventListener('click', () => {
-    scrollToBottom();
-    unreadCount = 0;
-    $unreadBadge.classList.remove('visible');
+    scrollToBottom(); unreadCount = 0; $unreadBadge.classList.remove('visible');
   });
 
-  // ── User List ─────────────────────────────────────────────────────────
   function renderUserList(users) {
     $userList.innerHTML = '';
     $onlineCount.textContent = `${users.length} online`;
@@ -881,13 +878,6 @@
     });
   }
 
-  // ── Typing Indicator ──────────────────────────────────────────────────
-  function showTyping(user) {
-    typingUsers.add(user);
-    updateTypingUI();
-
-    // Auto-clear after 4s if stopTyping never arrives
-    setTimeout(() => clearTyping(user), 4000);
   }
 
   function clearTyping(user) {
